@@ -367,6 +367,7 @@
   "LabelExplicitChecked": "Explicit (checked)",
   "LabelExplicitUnchecked": "Not Explicit (unchecked)",
   "LabelExportJSON": "Export JSON",
+  "LabelExportCSV": "Export CSV",
   "LabelExportOPML": "Export OPML",
   "LabelFeedURL": "Feed URL",
   "LabelFetchingMetadata": "Fetching Metadata",

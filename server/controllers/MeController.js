@@ -37,6 +37,24 @@ class MeController {
   async getListeningSessions(req, res) {
     const listeningSessions = await this.getUserListeningSessionsHelper(req.user.id)
 
+    // if client wants all sessions without pagination
+    if (req.query.all === '1' || req.query.all === 'true') {
+      if (req.query.format === 'csv') {
+        // build CSV
+        const fields = ['id', 'libraryItemId', 'mediaItemId', 'episodeId', 'timeListening', 'currentTime', 'updatedAt', 'playMethod', 'deviceInfo']
+        const csvRows = [fields.join(',')]
+        for (const s of listeningSessions) {
+          const row = [s.id, s.libraryItemId || '', s.mediaItemId || '', s.episodeId || '', s.timeListening || '', s.currentTime || '', s.updatedAt || '', s.playMethod || '', '"' + JSON.stringify(s.deviceInfo || {}).replace(/"/g, '""') + '"']
+          csvRows.push(row.join(','))
+        }
+        const csvText = csvRows.join('\r\n')
+        res.setHeader('Content-Type', 'text/csv')
+        return res.send(csvText)
+      }
+
+      return res.json({ sessions: listeningSessions })
+    }
+
     const itemsPerPage = toNumber(req.query.itemsPerPage, 10) || 10
     const page = toNumber(req.query.page, 0)
 

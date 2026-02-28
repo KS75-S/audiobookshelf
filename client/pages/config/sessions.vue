@@ -1,8 +1,12 @@
 <template>
   <div>
     <app-settings-content :header-text="$strings.HeaderListeningSessions">
-      <div class="flex justify-end mb-2">
+      <div class="flex flex-wrap justify-between items-center mb-2 gap-2">
         <ui-dropdown v-model="selectedUser" :items="userItems" :label="$strings.LabelFilterByUser" small class="max-w-48" @input="updateUserFilter" />
+        <div class="flex gap-2">
+          <ui-btn small :disabled="exportingSessions" @click="exportSessions('json')">{{ $strings.LabelExportJSON }}</ui-btn>
+          <ui-btn small :disabled="exportingSessions" @click="exportSessions('csv')">{{ $strings.LabelExportCSV || 'Export CSV' }}</ui-btn>
+        </div>
       </div>
 
       <div v-if="listeningSessions.length" class="block max-w-full relative">
@@ -30,6 +34,7 @@
                   {{ $strings.LabelPlayMethod }} <span :class="{ 'opacity-0 group-hover:opacity-30': !isSortSelected('playMethod') }" class="material-symbols text-base pl-px">{{ sortDesc ? 'arrow_drop_down' : 'arrow_drop_up' }}</span>
                 </div>
               </th>
+              exportingSessions: false
               <th v-if="!numSelected" class="w-32 min-w-32 text-left hidden sm:table-cell">{{ $strings.LabelDeviceInfo }}</th>
               <th v-if="!numSelected" class="w-24 min-w-24 sm:w-32 sm:min-w-32 group cursor-pointer" @click.stop="sortColumn('timeListening')">
                 <div class="inline-flex items-center">
@@ -270,6 +275,55 @@ export default {
     }
   },
   methods: {
+    async exportSessions(format) {
+      this.exportingSessions = true
+      try {
+        // Build params for current filter
+        const urlSearchParams = new URLSearchParams()
+        urlSearchParams.set('page', 0)
+        urlSearchParams.set('itemsPerPage', 1000000) // Large number to get all
+        urlSearchParams.set('sort', this.sortBy)
+        urlSearchParams.set('desc', this.sortDesc ? '1' : '0')
+        if (this.selectedUser) {
+          urlSearchParams.set('user', this.selectedUser)
+        }
+        const data = await this.$axios.$get(`/api/sessions?${urlSearchParams.toString()}`)
+        const sessions = data.sessions || []
+        if (format === 'json') {
+          const payload = {
+            meta: {
+              type: 'user-listening-sessions',
+              exportedAt: new Date().toISOString(),
+              user: this.$store.state.user.user?.username || null,
+              filter: this.selectedUser || 'all'
+            },
+            sessions
+          }
+          const jsonText = JSON.stringify(payload, null, 2)
+          const blob = new Blob([jsonText], { type: 'application/json' })
+          const url = URL.createObjectURL(blob)
+          this.$downloadFile(url, `listening-sessions-${this.selectedUser || 'all'}-${new Date().toISOString().slice(0, 10)}.json`)
+          setTimeout(() => URL.revokeObjectURL(url), 1000)
+        } else if (format === 'csv') {
+          // Build CSV header and rows
+          const fields = ['id', 'user.username', 'displayTitle', 'displayAuthor', 'playMethod', 'deviceInfo.clientName', 'deviceInfo.osName', 'deviceInfo.browserName', 'timeListening', 'currentTime', 'updatedAt']
+          const csvRows = [fields.join(',')]
+          for (const s of sessions) {
+            const row = [s.id, s.user?.username || '', '"' + (s.displayTitle || '').replace(/"/g, '""') + '"', '"' + (s.displayAuthor || '').replace(/"/g, '""') + '"', s.playMethod || '', s.deviceInfo?.clientName || '', s.deviceInfo?.osName || '', s.deviceInfo?.browserName || '', s.timeListening || '', s.currentTime || '', s.updatedAt || '']
+            csvRows.push(row.map((x) => (typeof x === 'string' && x.includes(',') ? '"' + x + '"' : x)).join(','))
+          }
+          const csvText = csvRows.join('\r\n')
+          const blob = new Blob([csvText], { type: 'text/csv' })
+          const url = URL.createObjectURL(blob)
+          this.$downloadFile(url, `listening-sessions-${this.selectedUser || 'all'}-${new Date().toISOString().slice(0, 10)}.csv`)
+          setTimeout(() => URL.revokeObjectURL(url), 1000)
+        }
+      } catch (e) {
+        this.$toast.error('Failed to export sessions')
+      } finally {
+        this.exportingSessions = false
+      }
+    },
     isSortSelected(column) {
       return this.sortBy === column
     },

@@ -435,6 +435,29 @@ class UserController {
   async getListeningSessions(req, res) {
     var listeningSessions = await this.getUserListeningSessionsHelper(req.params.id)
 
+    if (req.query.all === '1' || req.query.all === 'true') {
+      // include user information for each session
+      const sessionsWithUser = listeningSessions.map((session) => ({
+        ...session,
+        user: {
+          id: req.reqUser.id,
+          username: req.reqUser.username
+        }
+      }))
+      if (req.query.format === 'csv') {
+        const fields = ['id', 'libraryItemId', 'mediaItemId', 'episodeId', 'timeListening', 'currentTime', 'updatedAt', 'playMethod', 'deviceInfo', 'user.id', 'user.username']
+        const csvRows = [fields.join(',')]
+        for (const s of sessionsWithUser) {
+          const row = [s.id, s.libraryItemId || '', s.mediaItemId || '', s.episodeId || '', s.timeListening || '', s.currentTime || '', s.updatedAt || '', s.playMethod || '', '"' + JSON.stringify(s.deviceInfo || {}).replace(/"/g, '""') + '"', s.user.id || '', s.user.username || '']
+          csvRows.push(row.join(','))
+        }
+        const csvText = csvRows.join('\r\n')
+        res.setHeader('Content-Type', 'text/csv')
+        return res.send(csvText)
+      }
+      return res.json({ sessions: sessionsWithUser })
+    }
+
     const itemsPerPage = toNumber(req.query.itemsPerPage, 10) || 10
     const page = toNumber(req.query.page, 0)
 
