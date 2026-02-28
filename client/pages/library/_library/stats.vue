@@ -3,6 +3,13 @@
     <app-book-shelf-toolbar page="library-stats" is-home />
     <div id="bookshelf" class="w-full h-full px-1 py-4 md:p-8 relative overflow-y-auto">
       <div class="w-full max-w-4xl mx-auto">
+        <div class="flex items-center mb-4">
+          <h1 class="text-2xl">{{ $strings.HeaderLibraryStats }}</h1>
+          <div class="grow" />
+          <ui-btn class="text-xs" :padding-x="1.5" :padding-y="1" :disabled="!libraryStats" @click="downloadStatsJson">
+            {{ $strings.LabelExportJSON }}
+          </ui-btn>
+        </div>
         <stats-preview-icons v-if="totalItems" :library-stats="libraryStats" />
 
         <div class="flex lg:flex-row flex-wrap justify-between flex-col mt-8">
@@ -168,6 +175,43 @@ export default {
     }
   },
   methods: {
+    buildStatsPayload() {
+      return {
+        meta: {
+          type: 'library-stats',
+          library: {
+            id: this.currentLibraryId,
+            name: this.currentLibraryName,
+            mediaType: this.currentLibraryMediaType
+          },
+          generatedAt: new Date().toISOString(),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        },
+        stats: this.libraryStats
+      }
+    },
+    sanitizeFilename(value) {
+      return (value || 'library')
+        .replace(/[^a-zA-Z0-9-_]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+    },
+    downloadJson(payload, filename) {
+      const jsonText = JSON.stringify(payload, null, 2)
+      const blob = new Blob([jsonText], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      this.$downloadFile(url, filename)
+      setTimeout(() => {
+        URL.revokeObjectURL(url)
+      }, 1000)
+    },
+    downloadStatsJson() {
+      if (!this.libraryStats) return
+      const today = new Date().toISOString().slice(0, 10)
+      const libraryName = this.sanitizeFilename(this.currentLibraryName)
+      const filename = `library-stats-${libraryName || this.currentLibraryId}-${today}.json`
+      this.downloadJson(this.buildStatsPayload(), filename)
+    },
     async init() {
       this.libraryStats = await this.$axios.$get(`/api/libraries/${this.currentLibraryId}/stats`).catch((err) => {
         console.error('Failed to get library stats', err)

@@ -4,6 +4,12 @@
     <stats-year-in-review-banner v-if="showYearInReviewBanner" />
 
     <app-settings-content :header-text="$strings.HeaderYourStats" class="mb-4!">
+      <template #header-items>
+        <div class="grow" />
+        <ui-btn class="text-xs" :padding-x="1.5" :padding-y="1" :disabled="!listeningStats" @click="downloadStatsJson">
+          {{ $strings.LabelExportJSON }}
+        </ui-btn>
+      </template>
       <div class="flex justify-center">
         <div class="flex p-2">
           <div class="hidden sm:block">
@@ -118,6 +124,35 @@ export default {
     }
   },
   methods: {
+    buildStatsPayload() {
+      return {
+        meta: {
+          type: 'user-listening-stats',
+          user: {
+            id: this.user.id,
+            username: this.user.username
+          },
+          generatedAt: new Date().toISOString(),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        },
+        stats: this.listeningStats
+      }
+    },
+    downloadJson(payload, filename) {
+      const jsonText = JSON.stringify(payload, null, 2)
+      const blob = new Blob([jsonText], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      this.$downloadFile(url, filename)
+      setTimeout(() => {
+        URL.revokeObjectURL(url)
+      }, 1000)
+    },
+    downloadStatsJson() {
+      if (!this.listeningStats) return
+      const today = new Date().toISOString().slice(0, 10)
+      const filename = `user-stats-${today}.json`
+      this.downloadJson(this.buildStatsPayload(), filename)
+    },
     async init() {
       this.listeningStats = await this.$axios.$get(`/api/me/listening-stats`).catch((err) => {
         console.error('Failed to load listening sesions', err)

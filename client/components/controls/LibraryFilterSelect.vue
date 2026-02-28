@@ -240,6 +240,11 @@ export default {
           text: this.$strings.LabelRSSFeedOpen,
           value: 'feed-open',
           sublist: false
+        },
+        {
+          text: 'File Type',
+          value: 'fileType',
+          sublist: true
         }
       ]
 
@@ -505,6 +510,20 @@ export default {
       ]
     },
     sublistItems() {
+      if (this.sublist === 'fileType') {
+        // Dynamically import SupportedFileTypes from constants
+        let audioTypes = [];
+        try {
+          const constants = require('@/plugins/constants.js');
+          audioTypes = constants.SupportedFileTypes.audio || [];
+        } catch (e) {
+          audioTypes = ['m4b', 'mp3', 'm4a', 'flac', 'opus', 'ogg', 'oga', 'mp4', 'aac', 'wma', 'aiff', 'aif', 'wav', 'webm', 'webma', 'mka', 'awb', 'caf', 'mpeg', 'mpg'];
+        }
+        return audioTypes.map((type) => ({
+          text: type.toUpperCase(),
+          value: this.$encode(type)
+        }));
+      }
       const sublistItems = (this[this.sublist] || []).map((item) => {
         if (typeof item === 'string') {
           return {
@@ -524,7 +543,7 @@ export default {
           value: this.$encode('no-series')
         })
       }
-      return sublistItems
+      return sublistItems;
     },
     filterData() {
       return this.$store.state.libraries.filterData || {}
