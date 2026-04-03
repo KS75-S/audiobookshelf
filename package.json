@@ -61,9 +61,12 @@
   },
   "devDependencies": {
     "chai": "^4.3.10",
-    "mocha": "^11.7.5",
+    "mocha": "^11.3.0",
     "nodemon": "^3.1.14",
     "nyc": "^15.1.0",
     "sinon": "^17.0.1"
+  },
+  "overrides": {
+    "serialize-javascript": "^7.0.5"
   }
 }
