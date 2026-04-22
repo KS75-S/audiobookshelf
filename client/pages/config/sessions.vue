@@ -71,7 +71,11 @@
                 <p class="text-xs">{{ getPlayMethodName(session.playMethod) }}</p>
               </td>
               <td class="hidden sm:table-cell max-w-32 min-w-32">
-                <p class="text-xs truncate" v-html="getDeviceInfoString(session.deviceInfo)" />
+                <p class="text-xs truncate">
+                  <template v-for="(line, index) in getDeviceInfoLines(session.deviceInfo)">
+                    <br v-if="index > 0" :key="'br-' + index" />{{ line }}
+                  </template>
+                </p>
               </td>
               <td class="text-center w-24 min-w-24 sm:w-32 sm:min-w-32">
                 <p class="text-xs font-mono">{{ $elapsedPrettyLocalized(session.timeListening) }}</p>
@@ -135,7 +139,11 @@
               <p class="text-xs">{{ getPlayMethodName(session.playMethod) }}</p>
             </td>
             <td class="hidden sm:table-cell max-w-32 min-w-32">
-              <p class="text-xs truncate" v-html="getDeviceInfoString(session.deviceInfo)" />
+              <p class="text-xs truncate">
+                <template v-for="(line, index) in getDeviceInfoLines(session.deviceInfo)">
+                  <br v-if="index > 0" :key="'br-' + index" />{{ line }}
+                </template>
+              </p>
             </td>
             <td class="text-center">
               <p class="text-xs font-mono">{{ $elapsedPretty(session.timeListening) }}</p>
@@ -177,7 +185,11 @@
               <p class="text-xs">{{ getPlayMethodName(session.playMethod) }}</p>
             </td>
             <td class="hidden sm:table-cell max-w-32 min-w-32">
-              <p class="text-xs truncate" v-html="getDeviceInfoString(session.deviceInfo)" />
+              <p class="text-xs truncate">
+                <template v-for="(line, index) in getDeviceInfoLines(session.deviceInfo)">
+                  <br v-if="index > 0" :key="'br-' + index" />{{ line }}
+                </template>
+              </p>
             </td>
             <td class="text-center hover:underline" @click.stop="clickCurrentTime(session)">
               <p class="text-xs font-mono">{{ $secondsToTimestamp(session.currentTime) }}</p>
@@ -487,16 +499,16 @@ export default {
       this.selectedSession = session
       this.showSessionModal = true
     },
-    getDeviceInfoString(deviceInfo) {
-      if (!deviceInfo) return ''
-      var lines = []
+    getDeviceInfoLines(deviceInfo) {
+      if (!deviceInfo) return []
+      const lines = []
       if (deviceInfo.clientName) lines.push(`${deviceInfo.clientName} ${deviceInfo.clientVersion || ''}`)
       if (deviceInfo.osName) lines.push(`${deviceInfo.osName} ${deviceInfo.osVersion}`)
       if (deviceInfo.browserName) lines.push(deviceInfo.browserName)
 
       if (deviceInfo.manufacturer && deviceInfo.model) lines.push(`${deviceInfo.manufacturer} ${deviceInfo.model}`)
       if (deviceInfo.sdkVersion) lines.push(`SDK Version: ${deviceInfo.sdkVersion}`)
-      return lines.join('<br>')
+      return lines
     },
     getPlayMethodName(playMethod) {
       if (playMethod === this.$constants.PlayMethod.DIRECTPLAY) return 'Direct Play'
