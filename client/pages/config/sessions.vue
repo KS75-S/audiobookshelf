@@ -16,7 +16,7 @@
               <th class="w-6 min-w-6 text-left hidden md:table-cell h-11">
                 <ui-checkbox v-model="isAllSelected" :partial="numSelected > 0 && !isAllSelected" small checkbox-bg="bg" />
               </th>
-              <th v-if="numSelected" class="grow text-left" :colspan="7">
+              <th v-if="numSelected" class="grow text-left" :colspan="9">
                 <div class="flex items-center">
                   <p>{{ $getString('MessageSelected', [numSelected]) }}</p>
                   <div class="grow" />
@@ -46,6 +46,7 @@
                   {{ $strings.LabelLastTime }} <span :class="{ 'opacity-0 group-hover:opacity-30': !isSortSelected('currentTime') }" class="material-symbols text-base pl-px hidden sm:inline-block">{{ sortDesc ? 'arrow_drop_down' : 'arrow_drop_up' }}</span>
                 </div>
               </th>
+              <th v-if="!numSelected" class="w-16 min-w-16 text-center hidden sm:table-cell">{{ $strings.LabelProgress }}</th>
               <th v-if="!numSelected" class="grow hidden sm:table-cell cursor-pointer group" @click.stop="sortColumn('updatedAt')">
                 <div class="inline-flex items-center">
                   {{ $strings.LabelLastUpdate }} <span :class="{ 'opacity-0 group-hover:opacity-30': !isSortSelected('updatedAt') }" class="material-symbols text-base pl-px">{{ sortDesc ? 'arrow_drop_down' : 'arrow_drop_up' }}</span>
@@ -82,6 +83,9 @@
               </td>
               <td class="text-center hover:underline w-24 min-w-24" @click.stop="clickCurrentTime(session)">
                 <p class="text-xs font-mono">{{ $secondsToTimestamp(session.currentTime) }}</p>
+              </td>
+              <td class="text-center hidden sm:table-cell">
+                <p class="text-xs font-mono">{{ getProgressPercent(session) }}</p>
               </td>
               <td class="text-center hidden sm:table-cell">
                 <ui-tooltip v-if="session.updatedAt" direction="top" :text="$formatDatetime(session.updatedAt, dateFormat, timeFormat)">
@@ -124,6 +128,7 @@
             <th class="w-32 min-w-32 text-left hidden sm:table-cell">{{ $strings.LabelDeviceInfo }}</th>
             <th class="w-32 min-w-32">{{ $strings.LabelTimeListened }}</th>
             <th class="w-16 min-w-16">{{ $strings.LabelLastTime }}</th>
+            <th class="w-16 min-w-16 text-center hidden sm:table-cell">{{ $strings.LabelProgress }}</th>
             <th class="grow hidden sm:table-cell">{{ $strings.LabelLastUpdate }}</th>
           </tr>
 
@@ -152,6 +157,9 @@
               <p class="text-xs font-mono">{{ $secondsToTimestamp(session.currentTime) }}</p>
             </td>
             <td class="text-center hidden sm:table-cell">
+              <p class="text-xs font-mono">{{ getProgressPercent(session) }}</p>
+            </td>
+            <td class="text-center hidden sm:table-cell">
               <ui-tooltip v-if="session.updatedAt" direction="top" :text="$formatDatetime(session.updatedAt, dateFormat, timeFormat)">
                 <p class="text-xs text-gray-200">{{ $dateDistanceFromNow(session.updatedAt) }}</p>
               </ui-tooltip>
@@ -172,6 +180,7 @@
             <th class="w-32 min-w-32 text-left hidden md:table-cell">{{ $strings.LabelPlayMethod }}</th>
             <th class="w-32 min-w-32 text-left hidden sm:table-cell">{{ $strings.LabelDeviceInfo }}</th>
             <th class="w-16 min-w-16">{{ $strings.LabelLastTime }}</th>
+            <th class="w-16 min-w-16 text-center hidden sm:table-cell">{{ $strings.LabelProgress }}</th>
             <th class="grow hidden sm:table-cell">{{ $strings.LabelLastUpdate }}</th>
           </tr>
 
@@ -193,6 +202,9 @@
             </td>
             <td class="text-center hover:underline" @click.stop="clickCurrentTime(session)">
               <p class="text-xs font-mono">{{ $secondsToTimestamp(session.currentTime) }}</p>
+            </td>
+            <td class="text-center hidden sm:table-cell">
+              <p class="text-xs font-mono">{{ getProgressPercent(session) }}</p>
             </td>
             <td class="text-center hidden sm:table-cell">
               <ui-tooltip v-if="session.updatedAt" direction="top" :text="$formatDatetime(session.updatedAt, dateFormat, timeFormat)">
@@ -318,10 +330,11 @@ export default {
           setTimeout(() => URL.revokeObjectURL(url), 1000)
         } else if (format === 'csv') {
           // Build CSV header and rows
-          const fields = ['id', 'user.username', 'displayTitle', 'displayAuthor', 'playMethod', 'deviceInfo.clientName', 'deviceInfo.osName', 'deviceInfo.browserName', 'timeListening', 'currentTime', 'updatedAt']
+          const fields = ['id', 'user.username', 'displayTitle', 'displayAuthor', 'playMethod', 'deviceInfo.clientName', 'deviceInfo.osName', 'deviceInfo.browserName', 'timeListening', 'currentTime', 'duration', 'progress', 'updatedAt']
           const csvRows = [fields.join(',')]
           for (const s of sessions) {
-            const row = [s.id, s.user?.username || '', '"' + (s.displayTitle || '').replace(/"/g, '""') + '"', '"' + (s.displayAuthor || '').replace(/"/g, '""') + '"', s.playMethod || '', s.deviceInfo?.clientName || '', s.deviceInfo?.osName || '', s.deviceInfo?.browserName || '', s.timeListening || '', s.currentTime || '', s.updatedAt || '']
+            const progress = s.duration ? Math.floor((s.currentTime / s.duration) * 100) : 0
+            const row = [s.id, s.user?.username || '', '"' + (s.displayTitle || '').replace(/"/g, '""') + '"', '"' + (s.displayAuthor || '').replace(/"/g, '""') + '"', s.playMethod || '', s.deviceInfo?.clientName || '', s.deviceInfo?.osName || '', s.deviceInfo?.browserName || '', s.timeListening || '', s.currentTime || '', s.duration || '', progress, s.updatedAt || '']
             csvRows.push(row.map((x) => (typeof x === 'string' && x.includes(',') ? '"' + x + '"' : x)).join(','))
           }
           const csvText = csvRows.join('\r\n')
@@ -498,6 +511,11 @@ export default {
     showSession(session) {
       this.selectedSession = session
       this.showSessionModal = true
+    },
+    getProgressPercent(session) {
+      if (!session.duration) return '0%'
+      const percent = Math.floor((session.currentTime / session.duration) * 100)
+      return Math.min(100, Math.max(0, percent)) + '%'
     },
     getDeviceInfoLines(deviceInfo) {
       if (!deviceInfo) return []
