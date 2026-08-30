@@ -151,6 +151,16 @@
           <div class="py-2">
             <ui-multi-select v-model="newServerSettings.allowedOrigins" :items="newServerSettings.allowedOrigins" :label="$strings.LabelCorsAllowed" class="max-w-72" @input="updateCorsOrigins" />
           </div>
+
+          <div class="pt-4">
+            <h2 class="font-semibold">{{ $strings.LabelWebhookPush }}</h2>
+          </div>
+          <div class="py-2">
+            <ui-text-input-with-label :label="$strings.LabelWebhookPushUrl" v-model="newServerSettings.pushSessionsWebhookUrl" :disabled="updatingServerSettings" @input="(val) => updateSettingsKey('pushSessionsWebhookUrl', val)" />
+          </div>
+          <div class="py-2">
+            <ui-text-input-with-label :label="$strings.LabelWebhookPushApiKey" v-model="newServerSettings.pushSessionsApiKey" type="password" :disabled="updatingServerSettings" @input="(val) => updateSettingsKey('pushSessionsApiKey', val)" />
+          </div>
         </div>
       </div>
     </app-settings-content>

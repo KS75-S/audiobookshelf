@@ -230,6 +230,7 @@ class ApiRouter {
     this.router.delete('/sessions/:id', SessionController.middleware.bind(this), SessionController.delete.bind(this))
     this.router.get('/sessions/open', SessionController.getOpenSessions.bind(this))
     this.router.post('/sessions/batch/delete', SessionController.batchDelete.bind(this))
+    this.router.post('/sessions/push', SessionController.pushSessions.bind(this))
     this.router.post('/session/local', SessionController.syncLocal.bind(this))
     this.router.post('/session/local-all', SessionController.syncLocalSessions.bind(this))
     // TODO: Update these endpoints because they are only for open playback sessions

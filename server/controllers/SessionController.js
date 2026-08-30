@@ -1,4 +1,6 @@
 const Path = require('path')
+const http = require('http')
+const https = require('https')
 const { Request, Response, NextFunction } = require('express')
 const Logger = require('../Logger')
 const Database = require('../Database')
@@ -240,6 +242,95 @@ class SessionController {
     } catch (error) {
       Logger.error(`[SessionController] Failed to remove playback sessions`, error)
       res.status(500).send('Failed to remove sessions')
+    }
+  }
+
+  /**
+   * POST: /api/sessions/push
+   *
+   * @this {import('../routers/ApiRouter')}
+   *
+   * @param {RequestWithUser} req
+   * @param {Response} res
+   */
+  async pushSessions(req, res) {
+    if (!req.user.isAdminOrUp) {
+      Logger.error(`[SessionController] pushSessions: Non-admin user "${req.user.username}" attempted to push sessions`)
+      return res.sendStatus(404)
+    }
+
+    const webhookUrl = Database.serverSettings.pushSessionsWebhookUrl
+    if (!webhookUrl) {
+      return res.status(400).json({ error: 'No webhook URL configured' })
+    }
+
+    try {
+      const rows = await Database.playbackSessionModel.findAll({
+        include: [
+          { model: Database.deviceModel },
+          { model: Database.userModel, attributes: ['id', 'username'] }
+        ],
+        order: [['updatedAt', 'DESC']]
+      })
+
+      const sessions = rows.map((session) => {
+        const oldPlaybackSession = Database.playbackSessionModel.getOldPlaybackSession(session)
+        const json = oldPlaybackSession.toJSON ? oldPlaybackSession.toJSON() : { ...oldPlaybackSession }
+        if (session.user) {
+          json.user = { id: session.user.id, username: session.user.username }
+        }
+        return json
+      })
+
+      const payload = JSON.stringify({
+        source: 'audiobookshelf',
+        triggeredBy: 'manual',
+        exportedAt: new Date().toISOString(),
+        sessions
+      })
+
+      const apiKey = Database.serverSettings.pushSessionsApiKey
+      const url = new URL(webhookUrl)
+      const transport = url.protocol === 'https:' ? https : http
+
+      await new Promise((resolve, reject) => {
+        const headers = {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload)
+        }
+        if (apiKey) {
+          headers['Authorization'] = 'Bearer ' + apiKey
+        }
+        const options = {
+          hostname: url.hostname,
+          port: url.port || (url.protocol === 'https:' ? 443 : 80),
+          path: url.pathname + url.search,
+          method: 'POST',
+          headers
+        }
+
+        const reqHttp = transport.request(options, (resp) => {
+          let body = ''
+          resp.on('data', (chunk) => { body += chunk })
+          resp.on('end', () => {
+            if (resp.statusCode >= 200 && resp.statusCode < 300) {
+              resolve()
+            } else {
+              reject(new Error(`HTTP ${resp.statusCode}: ${body}`))
+            }
+          })
+        })
+
+        reqHttp.on('error', reject)
+        reqHttp.write(payload)
+        reqHttp.end()
+      })
+
+      Logger.info(`[SessionController] ${sessions.length} sessions pushed to webhook by "${req.user.username}"`)
+      res.json({ success: true, count: sessions.length })
+    } catch (error) {
+      Logger.error(`[SessionController] Failed to push sessions`, error)
+      res.status(500).json({ error: error.message || 'Failed to push sessions' })
     }
   }
 

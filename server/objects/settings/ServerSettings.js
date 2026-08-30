@@ -84,6 +84,10 @@ class ServerSettings {
     this.authOpenIDAdvancedPermsClaim = ''
     this.authOpenIDSubfolderForRedirectURLs = undefined
 
+    // Webhook push
+    this.pushSessionsWebhookUrl = null
+    this.pushSessionsApiKey = null
+
     if (settings) {
       this.construct(settings)
     }
@@ -147,6 +151,10 @@ class ServerSettings {
     this.authOpenIDGroupClaim = settings.authOpenIDGroupClaim || ''
     this.authOpenIDAdvancedPermsClaim = settings.authOpenIDAdvancedPermsClaim || ''
     this.authOpenIDSubfolderForRedirectURLs = settings.authOpenIDSubfolderForRedirectURLs
+
+    // Webhook push
+    this.pushSessionsWebhookUrl = settings.pushSessionsWebhookUrl || null
+    this.pushSessionsApiKey = settings.pushSessionsApiKey || null
 
     if (!Array.isArray(this.authActiveAuthMethods)) {
       this.authActiveAuthMethods = ['local']
@@ -256,7 +264,9 @@ class ServerSettings {
       authOpenIDMobileRedirectURIs: this.authOpenIDMobileRedirectURIs, // Do not return to client
       authOpenIDGroupClaim: this.authOpenIDGroupClaim, // Do not return to client
       authOpenIDAdvancedPermsClaim: this.authOpenIDAdvancedPermsClaim, // Do not return to client
-      authOpenIDSubfolderForRedirectURLs: this.authOpenIDSubfolderForRedirectURLs
+      authOpenIDSubfolderForRedirectURLs: this.authOpenIDSubfolderForRedirectURLs,
+      pushSessionsWebhookUrl: this.pushSessionsWebhookUrl,
+      pushSessionsApiKey: this.pushSessionsApiKey
     }
   }
 

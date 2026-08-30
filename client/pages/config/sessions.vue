@@ -4,8 +4,9 @@
       <div class="flex flex-wrap justify-between items-center mb-2 gap-2">
         <ui-dropdown v-model="selectedUser" :items="userItems" :label="$strings.LabelFilterByUser" small class="max-w-48" @input="updateUserFilter" />
         <div class="flex gap-2">
-          <ui-btn small :disabled="exportingSessions" @click="exportSessions('json')">{{ $strings.LabelExportJSON }}</ui-btn>
-          <ui-btn small :disabled="exportingSessions" @click="exportSessions('csv')">{{ $strings.LabelExportCSV || 'Export CSV' }}</ui-btn>
+          <ui-btn small :disabled="exportingSessions || pushingSessions" @click="exportSessions('json')">{{ $strings.LabelExportJSON }}</ui-btn>
+          <ui-btn small :disabled="exportingSessions || pushingSessions" @click="exportSessions('csv')">{{ $strings.LabelExportCSV || 'Export CSV' }}</ui-btn>
+          <ui-btn small color="bg-primary" :loading="pushingSessions" :disabled="exportingSessions" @click="pushSessionsToWebhook">{{ $strings.ButtonPushToBookKase }}</ui-btn>
         </div>
       </div>
 
@@ -34,7 +35,6 @@
                   {{ $strings.LabelPlayMethod }} <span :class="{ 'opacity-0 group-hover:opacity-30': !isSortSelected('playMethod') }" class="material-symbols text-base pl-px">{{ sortDesc ? 'arrow_drop_down' : 'arrow_drop_up' }}</span>
                 </div>
               </th>
-              exportingSessions: false
               <th v-if="!numSelected" class="w-32 min-w-32 text-left hidden sm:table-cell">{{ $strings.LabelDeviceInfo }}</th>
               <th v-if="!numSelected" class="w-24 min-w-24 sm:w-32 sm:min-w-32 group cursor-pointer" @click.stop="sortColumn('timeListening')">
                 <div class="inline-flex items-center">
@@ -261,6 +261,8 @@ export default {
       sortDesc: true,
       processingGoToTimestamp: false,
       deletingSessions: false,
+      exportingSessions: false,
+      pushingSessions: false,
       itemsPerPageOptions: [10, 25, 50, 100]
     }
   },
@@ -323,7 +325,12 @@ export default {
             },
             sessions
           }
-          const jsonText = JSON.stringify(payload, null, 2)
+          const jsonText = JSON.stringify(payload, (key, value) => {
+            if (typeof value === 'string') {
+              return value.replace(/\u2028/g, '\n').replace(/\u2029/g, '\n')
+            }
+            return value
+          }, 2)
           const blob = new Blob([jsonText], { type: 'application/json' })
           const url = URL.createObjectURL(blob)
           this.$downloadFile(url, `listening-sessions-${this.selectedUser || 'all'}-${new Date().toISOString().slice(0, 10)}.json`)
@@ -332,9 +339,10 @@ export default {
           // Build CSV header and rows
           const fields = ['id', 'user.username', 'displayTitle', 'displayAuthor', 'playMethod', 'deviceInfo.clientName', 'deviceInfo.osName', 'deviceInfo.browserName', 'timeListening', 'currentTime', 'duration', 'progress', 'updatedAt']
           const csvRows = [fields.join(',')]
+          const sanitize = (v) => (v || '').replace(/\u2028/g, ' ').replace(/\u2029/g, ' ')
           for (const s of sessions) {
             const progress = s.duration ? Math.floor((s.currentTime / s.duration) * 100) : 0
-            const row = [s.id, s.user?.username || '', '"' + (s.displayTitle || '').replace(/"/g, '""') + '"', '"' + (s.displayAuthor || '').replace(/"/g, '""') + '"', s.playMethod || '', s.deviceInfo?.clientName || '', s.deviceInfo?.osName || '', s.deviceInfo?.browserName || '', s.timeListening || '', s.currentTime || '', s.duration || '', progress, s.updatedAt || '']
+            const row = [s.id, sanitize(s.user?.username), '"' + sanitize(s.displayTitle).replace(/"/g, '""') + '"', '"' + sanitize(s.displayAuthor).replace(/"/g, '""') + '"', s.playMethod || '', sanitize(s.deviceInfo?.clientName), sanitize(s.deviceInfo?.osName), sanitize(s.deviceInfo?.browserName), s.timeListening || '', s.currentTime || '', s.duration || '', progress, s.updatedAt || '']
             csvRows.push(row.map((x) => (typeof x === 'string' && x.includes(',') ? '"' + x + '"' : x)).join(','))
           }
           const csvText = csvRows.join('\r\n')
@@ -347,6 +355,18 @@ export default {
         this.$toast.error('Failed to export sessions')
       } finally {
         this.exportingSessions = false
+      }
+    },
+    async pushSessionsToWebhook() {
+      this.pushingSessions = true
+      try {
+        const result = await this.$axios.$post('/api/sessions/push')
+        this.$toast.success(this.$getString('ToastSessionsPushed', [result.count]))
+      } catch (error) {
+        const errorMsg = error.response?.data?.error || this.$strings.ToastPushFailed
+        this.$toast.error(errorMsg)
+      } finally {
+        this.pushingSessions = false
       }
     },
     isSortSelected(column) {
